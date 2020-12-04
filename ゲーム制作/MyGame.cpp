@@ -1,26 +1,32 @@
 #include"DxLib.h"
 
-#define GAME_WIDTH	1000
-#define GAME_HEIGHT 600
-#define GAME_COLOR	32
+#define GAME_WIDTH	1000	//画面の横
+#define GAME_HEIGHT 600		//画面の縦	
+#define GAME_COLOR	32		//画面のカラービット
 
 #define GAME_WINDOW_BAR 0
 #define GAME_WINDOW_NAME "レトロアクション"
 
-#define GAME_FPS	60
+#define GAME_FPS	60	//FPSの数値
 
 #define PATH_MAX	255
 
+//エラーメッセージ(タイトル画像)
 #define IMAGE_LOAD_ERR_TITLE	TEXT("画像読み込みエラー")
 
-#define IMAGE_TITLE_BK_PATH			TEXT(".\\IMAGE\\タイトル.png")
-#define IMAGE_TITLE_ROGO_PATH		TEXT(".\\IMAGE\\タイトル_レトロアクション_3.png")
-#define IMAGE_TITLE_ROGO_ROTA		0.005
-#define IMAGE_TITLE_ROGO_ROTA_MAX	1.0
-#define IMAGE_TITLE_ROGO_X_SPEED	1
-#define IMAGE_TITLE_START_PATH		TEXT(".\\IMAGE\\title_start_1.png")
-#define IMAGE_TITLE_START_CNT		1
-#define IMAGE_TITLE_START_CNT_MAX	30
+#define IMAGE_TITLE_BK_PATH			TEXT(".\\IMAGE\\タイトル.png")						//タイトル背景の画像
+#define IMAGE_TITLE_ROGO_PATH		TEXT(".\\IMAGE\\タイトル_レトロアクション_3.png")	//タイトルロゴの画像
+#define IMAGE_TITLE_ROGO_ROTA		0.005	//拡大率
+#define IMAGE_TITLE_ROGO_ROTA_MAX	1.0		//拡大率MAX
+#define IMAGE_TITLE_ROGO_X_SPEED	0		//X移動速度
+#define IMAGE_TITLE_START_PATH		TEXT(".\\IMAGE\\PUSH ENTER KEY.png")					//タイトルスタートの画像
+#define IMAGE_TITLE_START_CNT		1		//点滅カウンタ
+#define IMAGE_TITLE_START_CNT_MAX	30		//点滅カウンタMAX
+
+//エラーメッセージ(タイトルBGM)
+#define MUSIC_LOAD_ERR_TITLE	TEXT("音楽読み込みエラー")
+
+#define MUSIC_BGM_TITLE_PATH	TEXT(".\\MUSIC\\レトロゲーム風ピコピコ.mp3")	//タイトルのBGM
 
 enum GAME_SCENE {
 	GAME_SCENE_START,
@@ -43,6 +49,12 @@ typedef struct STRUCT_IMAGE
 	int width;
 	int height;
 }IMAGE;
+
+typedef struct STRUCT_MUSIC
+{
+	char path[PATH_MAX];
+	int handle;
+}MUSIC;
 
 typedef struct STRUCT_IMAGE_ROTA
 {
@@ -75,6 +87,8 @@ IMAGE ImageTitleBK;
 IMAGE_ROTA ImageTitleROGO;
 IMAGE_BLINK ImageTitleSTART;
 
+MUSIC BGM_TITLE;
+
 VOID MY_FPS_UPDATE(VOID);
 VOID MY_FPS_DRAW(VOID);
 VOID MY_FPS_WAIT(VOID);
@@ -99,6 +113,9 @@ VOID MY_END_DRAW(VOID);
 BOOL MY_LOAD_IMAGE(VOID);
 VOID MY_DELETE_IMAGE(VOID);
 
+BOOL MY_LOAD_MUSIC(VOID);		//音楽をまとめて読み込む関数
+VOID MY_DELETE_MUSIC(VOID);		//音楽をまとめて削除する関数
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCndShow)
 {
 	ChangeWindowMode(TRUE);
@@ -110,6 +127,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (DxLib_Init() == -1) { return-1; }
 
 	if (MY_LOAD_IMAGE() == FALSE) { return-1; }
+
+	if (MY_LOAD_MUSIC() == FALSE) { return -1; }
 
 	GameScene = GAME_SCENE_START;
 
@@ -141,6 +160,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	MY_DELETE_IMAGE();
+
+	MY_DELETE_MUSIC();
 
 	DxLib_End();
 
@@ -242,6 +263,7 @@ BOOL MY_KEYDOWN_KEEP(int KEY_INPUT_, int DownTime)
 	}
 }
 
+//スタート画面
 VOID MY_START(VOID)
 {
 	MY_START_PROC();
@@ -250,10 +272,22 @@ VOID MY_START(VOID)
 	return;
 }
 
+//スタート画面の処理
 VOID MY_START_PROC(VOID)
 {
+	if (CheckSoundMem(BGM_TITLE.handle) == 0)
+	{
+		ChangeVolumeSoundMem(255 * 50 / 100, BGM_TITLE.handle);
+		PlaySoundMem(BGM_TITLE.handle, DX_PLAYTYPE_LOOP);
+	}
+
 	if (MY_KEY_DOWN(KEY_INPUT_RETURN) == TRUE)
 	{
+		if (CheckSoundMem(BGM_TITLE.handle) != 0)
+		{
+			StopSoundMem(BGM_TITLE.handle);	//BGMを止める
+		}
+
 		GameScene = GAME_SCENE_PLAY;
 	}
 
@@ -289,6 +323,7 @@ VOID MY_START_PROC(VOID)
 	return;
 }
 
+//スタート画面の描画
 VOID MY_START_DRAW(VOID)
 {
 	DrawGraph(ImageTitleBK.x, ImageTitleBK.y, ImageTitleBK.handle, TRUE);
@@ -308,6 +343,7 @@ VOID MY_START_DRAW(VOID)
 	return;
 }
 
+//プレイ画面
 VOID MY_PLAY(VOID)
 {
 	MY_PLAY_PROC();
@@ -316,6 +352,7 @@ VOID MY_PLAY(VOID)
 	return;
 }
 
+//プレイ画面の処理
 VOID MY_PLAY_PROC(VOID)
 {
 	if (MY_KEY_DOWN(KEY_INPUT_SPACE) == TRUE)
@@ -326,6 +363,7 @@ VOID MY_PLAY_PROC(VOID)
 	return;
 }
 
+//プレイ画面の描画
 VOID MY_PLAY_DRAW(VOID)
 {
 	DrawBox(10, 10, GAME_WIDTH - 10, GAME_HEIGHT - 10, GetColor(0, 255, 0), TRUE);
@@ -334,6 +372,7 @@ VOID MY_PLAY_DRAW(VOID)
 	return;
 }
 
+//エンド画面
 VOID MY_END(VOID)
 {
 	MY_END_PROC();
@@ -342,6 +381,7 @@ VOID MY_END(VOID)
 	return;
 }
 
+//エンド画面の処理
 VOID MY_END_PROC(VOID)
 {
 	if (MY_KEY_DOWN(KEY_INPUT_ESCAPE) == TRUE)
@@ -352,6 +392,7 @@ VOID MY_END_PROC(VOID)
 	return;
 }
 
+//エンド画面の描画
 VOID MY_END_DRAW(VOID)
 {
 	DrawBox(10, 10, GAME_WIDTH - 10, GAME_HEIGHT - 10, GetColor(0, 0, 255), TRUE);
@@ -360,6 +401,7 @@ VOID MY_END_DRAW(VOID)
 	return;
 }
 
+//画像の読み込み
 BOOL MY_LOAD_IMAGE(VOID)
 {
 
@@ -386,8 +428,8 @@ BOOL MY_LOAD_IMAGE(VOID)
 		return FALSE;
 	}
 	GetGraphSize(ImageTitleROGO.image.handle, &ImageTitleROGO.image.width, &ImageTitleROGO.image.height);	//画像の幅と高さを取得
-	ImageTitleROGO.image.x = 230;							//光っている部分から描画したい
-	ImageTitleROGO.image.y = GAME_HEIGHT / 2;				//中央寄せ
+	ImageTitleROGO.image.x = 500;							//光っている部分から描画したい
+	ImageTitleROGO.image.y = GAME_HEIGHT / 3;				//中央寄せ
 	ImageTitleROGO.angle = DX_PI * 2;						//回転率
 	ImageTitleROGO.angleMAX = DX_PI * 2;					//回転率MAX
 	ImageTitleROGO.rate = 0.0;								//拡大率
@@ -418,6 +460,30 @@ VOID MY_DELETE_IMAGE(VOID)
 	DeleteGraph(ImageTitleBK.handle);
 	DeleteGraph(ImageTitleROGO.image.handle);
 	DeleteGraph(ImageTitleSTART.image.handle);
+
+	return;
+}
+
+//音楽の読み込み
+BOOL MY_LOAD_MUSIC(VOID)
+{
+	//タイトルのBGM
+	strcpy_s(BGM_TITLE.path, MUSIC_BGM_TITLE_PATH);				//パスの設定
+	BGM_TITLE.handle = LoadSoundMem(BGM_TITLE.path);			//読み込み
+	if (BGM_TITLE.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), MUSIC_BGM_TITLE_PATH, MUSIC_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+//音楽をまとめて削除する関数
+VOID MY_DELETE_MUSIC(VOID)
+{
+	DeleteSoundMem(BGM_TITLE.handle);
 
 	return;
 }
