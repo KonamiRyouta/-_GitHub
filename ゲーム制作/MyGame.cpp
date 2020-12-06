@@ -14,6 +14,8 @@
 //エラーメッセージ(タイトル画像)
 #define IMAGE_LOAD_ERR_TITLE	TEXT("画像読み込みエラー")
 
+#define IMAGE_BACK_PATH			TEXT(".\\IMAGE\\背景1.png")
+
 #define IMAGE_TITLE_BK_PATH			TEXT(".\\IMAGE\\タイトル.png")						//タイトル背景の画像
 #define IMAGE_TITLE_ROGO_PATH		TEXT(".\\IMAGE\\タイトル_レトロアクション_3.png")	//タイトルロゴの画像
 #define IMAGE_TITLE_ROGO_ROTA		0.005	//拡大率
@@ -87,6 +89,7 @@ char OldAllKeyState[256] = { '\0' };
 
 int GameScene;
 
+IMAGE ImageBack;
 IMAGE ImageTitleBK;
 IMAGE_ROTA ImageTitleROGO;
 IMAGE_BLINK ImageTitleSTART;
@@ -389,7 +392,7 @@ VOID MY_PLAY_PROC(VOID)
 //プレイ画面の描画
 VOID MY_PLAY_DRAW(VOID)
 {
-	DrawBox(10, 10, GAME_WIDTH - 10, GAME_HEIGHT - 10, GetColor(0, 255, 0), TRUE);
+	DrawGraph(ImageBack.x, ImageBack.y, ImageBack.handle, TRUE);
 
 	DrawString(0, 0, "プレイ画面(スペースーキーを押して)", GetColor(255, 255, 255));
 	return;
@@ -427,6 +430,17 @@ VOID MY_END_DRAW(VOID)
 //画像の読み込み
 BOOL MY_LOAD_IMAGE(VOID)
 {
+	strcpy_s(ImageBack.path, IMAGE_BACK_PATH);			//パスの設定
+	ImageBack.handle = LoadGraph(ImageBack.path);			//読み込み
+	if (ImageBack.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), IMAGE_BACK_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+	GetGraphSize(ImageBack.handle, &ImageBack.width, &ImageBack.height);	//画像の幅と高さを取得
+	ImageBack.x = GAME_WIDTH / 2 - ImageBack.width / 2;		//左右中央揃え
+	ImageBack.y = GAME_HEIGHT / 2 - ImageBack.height / 2;		//上下中央揃え
 
 	//タイトル背景
 	strcpy_s(ImageTitleBK.path, IMAGE_TITLE_BK_PATH);			//パスの設定
@@ -480,6 +494,7 @@ BOOL MY_LOAD_IMAGE(VOID)
 //画像をまとめて削除する関数
 VOID MY_DELETE_IMAGE(VOID)
 {
+	DeleteGraph(ImageBack.handle);
 	DeleteGraph(ImageTitleBK.handle);
 	DeleteGraph(ImageTitleROGO.image.handle);
 	DeleteGraph(ImageTitleSTART.image.handle);
