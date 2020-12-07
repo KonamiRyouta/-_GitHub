@@ -1,7 +1,7 @@
 #include"DxLib.h"
 
-#define GAME_WIDTH	1000	//画面の横
-#define GAME_HEIGHT 600		//画面の縦	
+#define GAME_WIDTH	1024	//画面の横
+#define GAME_HEIGHT 576		//画面の縦	
 #define GAME_COLOR	32		//画面のカラービット
 
 #define GAME_WINDOW_BAR 0
@@ -14,7 +14,7 @@
 //エラーメッセージ(タイトル画像)
 #define IMAGE_LOAD_ERR_TITLE	TEXT("画像読み込みエラー")
 
-#define IMAGE_BACK_PATH			TEXT(".\\IMAGE\\背景1.png")
+#define IMAGE_BACK_PATH			TEXT(".\\IMAGE\\背景_1.png")
 
 #define IMAGE_TITLE_BK_PATH			TEXT(".\\IMAGE\\タイトル.png")						//タイトル背景の画像
 #define IMAGE_TITLE_ROGO_PATH		TEXT(".\\IMAGE\\タイトル_レトロアクション_3.png")	//タイトルロゴの画像
@@ -33,6 +33,31 @@
 #define MUSIC_LOAD_ERR_TITLE	TEXT("音楽読み込みエラー")
 
 #define MUSIC_BGM_PATH	TEXT(".\\MUSIC\\NES-Action-D02-2(Stage1-Loop130).mp3")
+
+#define GAME_MAP_TATE_MAX	9
+#define GAME_MAP_YOKO_MAX	16
+#define GAME_MAP_KIND_MAX	2
+
+#define GAME_MAP_PATH			TEXT(".\\IMAGE\\MAP\\map1.png")
+
+#define MAP_DIV_WIDTH	64
+#define MAP_DIV_HEIGHT	64
+#define MAP_DIV_TATE	10
+#define MAP_DIV_YOKO	4
+#define MAP_DIV_NUM		MAP_DIV_TATE * MAP_DIV_YOKO
+
+#define START_ERR_TITLE		TEXT("スタート位置エラー")
+#define START_ERR_CAPTION	TEXT("スタート位置が決まっていません")
+
+enum GAME_MAP_KIND
+{
+	n = -1,
+	t = 0,
+	y = 1,
+	s = 2,
+	k = 3
+};	//マップの種類
+
 
 enum GAME_SCENE {
 	GAME_SCENE_START,
@@ -79,6 +104,24 @@ typedef struct STRUCT_IMAGE_BLINK
 	BOOL IsDraw;
 }IMAGE_BLINK;
 
+typedef struct STRUCT_MAP_IMAGE
+{
+	char path[PATH_MAX];				//パス
+	int handle[MAP_DIV_NUM];			//分割したの弾の画像ハンドルを取得
+	int kind[MAP_DIV_NUM];				//マップの種類
+	int width;							//幅
+	int height;							//高さ
+}MAPCHIP;	//MAP_IMAGE構造体
+
+typedef struct STRUCT_MAP
+{
+	GAME_MAP_KIND kind;			//マップの種類
+	int x;						//X位置
+	int y;						//Y位置
+	int width;					//幅
+	int height;					//高さ
+}MAP;	//MAP構造体
+
 int StartTimeFps;
 int CountFps;
 float CalcFps;
@@ -97,6 +140,31 @@ IMAGE_BLINK ImageTitleSTART;
 MUSIC BGM_TITLE;
 
 MUSIC BGM;
+
+GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
+	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
+		s,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 7
+		y,y,y,y,y,y,y,y,y,y,k,y,y,y,y,y,	// 8
+};	//ゲームのマップ
+
+//ゲームマップの初期化
+GAME_MAP_KIND mapDataInit[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX];
+
+//マップチップの画像を管理
+MAPCHIP mapChip;
+
+//マップの場所を管理
+MAP map[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX];
+
+//スタートの位置
+iPOINT startPt{ -1,-1 };
 
 VOID MY_FPS_UPDATE(VOID);
 VOID MY_FPS_DRAW(VOID);
@@ -142,6 +210,31 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	GameScene = GAME_SCENE_START;
 
 	SetDrawScreen(DX_SCREEN_BACK);
+
+	//プレイヤーの最初の位置を、スタート位置にする
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//スタート位置を探す
+			if (mapData[tate][yoko] == s)
+			{
+				//スタート位置を計算
+				startPt.x = mapChip.width * yoko + mapChip.width / 2;	//中心X座標を取得
+				startPt.y = mapChip.height * tate + mapChip.height / 2;	//中心Y座標を取得
+				break;
+			}
+		}
+		//スタートが決まっていれば、ループ終了
+		if (startPt.x != -1 && startPt.y != -1) { break; }
+	}
+
+	//スタートが決まっていなければ
+	if (startPt.x == -1 && startPt.y == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), START_ERR_CAPTION, START_ERR_TITLE, MB_OK);	return -1;
+	}
 
 	while (TRUE)
 	{
@@ -394,6 +487,19 @@ VOID MY_PLAY_DRAW(VOID)
 {
 	DrawGraph(ImageBack.x, ImageBack.y, ImageBack.handle, TRUE);
 
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//マップを描画
+			DrawGraph(
+				map[tate][yoko].x,
+				map[tate][yoko].y,
+				mapChip.handle[map[tate][yoko].kind],
+				TRUE);
+		}
+	}
+
 	DrawString(0, 0, "プレイ画面(スペースーキーを押して)", GetColor(255, 255, 255));
 	return;
 }
@@ -430,6 +536,7 @@ VOID MY_END_DRAW(VOID)
 //画像の読み込み
 BOOL MY_LOAD_IMAGE(VOID)
 {
+	//プレイ背景
 	strcpy_s(ImageBack.path, IMAGE_BACK_PATH);			//パスの設定
 	ImageBack.handle = LoadGraph(ImageBack.path);			//読み込み
 	if (ImageBack.handle == -1)
@@ -488,6 +595,43 @@ BOOL MY_LOAD_IMAGE(VOID)
 	ImageTitleSTART.CntMAX = IMAGE_TITLE_START_CNT_MAX;		//カウンタMAX
 	ImageTitleSTART.IsDraw = FALSE;							//描画させない
 
+		//マップの画像を分割する
+	int mapRes = LoadDivGraph(
+		GAME_MAP_PATH,										//赤弾のパス
+		MAP_DIV_NUM, MAP_DIV_TATE, MAP_DIV_YOKO,			//赤弾を分割する数
+		MAP_DIV_WIDTH, MAP_DIV_HEIGHT,						//画像を分割するの幅と高さ
+		&mapChip.handle[0]);								//分割した画像が入るハンドル
+
+	if (mapRes == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), GAME_MAP_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+
+	//幅と高さを取得
+	GetGraphSize(mapChip.handle[0], &mapChip.width, &mapChip.height);
+
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//マップデータ初期化用に情報をコピー
+			mapDataInit[tate][yoko] = mapData[tate][yoko];
+
+			//マップの種類をコピー
+			map[tate][yoko].kind = mapData[tate][yoko];
+
+			//マップの幅と高さをコピー
+			map[tate][yoko].width = mapChip.width;
+			map[tate][yoko].height = mapChip.height;
+
+			//マップの座標を設定
+			map[tate][yoko].x = yoko * map[tate][yoko].width;
+			map[tate][yoko].y = tate * map[tate][yoko].height;
+		}
+	}
+
 	return TRUE;
 }
 
@@ -498,6 +642,8 @@ VOID MY_DELETE_IMAGE(VOID)
 	DeleteGraph(ImageTitleBK.handle);
 	DeleteGraph(ImageTitleROGO.image.handle);
 	DeleteGraph(ImageTitleSTART.image.handle);
+
+	for (int i_num = 0; i_num < MAP_DIV_NUM; i_num++) { DeleteGraph(mapChip.handle[i_num]); }
 
 	return;
 }
