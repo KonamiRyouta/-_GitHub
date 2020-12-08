@@ -14,7 +14,8 @@
 //エラーメッセージ(タイトル画像)
 #define IMAGE_LOAD_ERR_TITLE	TEXT("画像読み込みエラー")
 
-#define IMAGE_BACK_PATH			TEXT(".\\IMAGE\\背景_1.png")
+#define IMAGE_BACK_PATH			TEXT(".\\IMAGE\\背景_a.png")
+#define IMAGE_PLAYER_PATH		TEXT(".\\IMAGE\\キャラ.png")	//プレイヤーの画像
 
 #define IMAGE_TITLE_BK_PATH			TEXT(".\\IMAGE\\タイトル.png")						//タイトル背景の画像
 #define IMAGE_TITLE_ROGO_PATH		TEXT(".\\IMAGE\\タイトル_レトロアクション_3.png")	//タイトルロゴの画像
@@ -29,6 +30,7 @@
 #define MUSIC_LOAD_ERR_TITLE	TEXT("音楽読み込みエラー")
 
 #define MUSIC_BGM_TITLE_PATH	TEXT(".\\MUSIC\\レトロゲーム風ピコピコ.mp3")	//タイトルのBGM
+#define MUSIC_PUSH_ENTER_PATH	TEXT(".\\MUSIC\\システム決定音_9.mp3")
 
 #define MUSIC_LOAD_ERR_TITLE	TEXT("音楽読み込みエラー")
 
@@ -55,7 +57,8 @@ enum GAME_MAP_KIND
 	t = 0,
 	y = 1,
 	s = 2,
-	k = 3
+	k = 3,
+	o = 5
 };	//マップの種類
 
 
@@ -64,6 +67,12 @@ enum GAME_SCENE {
 	GAME_SCENE_PLAY,
 	GAME_SCENE_END
 };
+
+enum CHARA_SPEED {
+	CHARA_SPEED_LOW = 1,
+	CHARA_SPEED_MIDI = 2,
+	CHARA_SPEED_HIGH = 3
+};	//キャラクターのスピード
 
 typedef struct STRUCT_I_POINT
 {
@@ -80,6 +89,15 @@ typedef struct STRUCT_IMAGE
 	int width;
 	int height;
 }IMAGE;
+
+typedef struct STRUCT_CHARA
+{
+	IMAGE image;				//IMAGE構造体
+	int speed;					//速さ
+	int CenterX;				//中心X
+	int CenterY;				//中心Y
+
+}CHARA;	//キャラクター構造体
 
 typedef struct STRUCT_MUSIC
 {
@@ -133,12 +151,13 @@ char OldAllKeyState[256] = { '\0' };
 int GameScene;
 
 IMAGE ImageBack;
+CHARA player;			//ゲームのキャラ
 IMAGE ImageTitleBK;
 IMAGE_ROTA ImageTitleROGO;
 IMAGE_BLINK ImageTitleSTART;
 
 MUSIC BGM_TITLE;
-
+MUSIC BGM_PUSH;
 MUSIC BGM;
 
 GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
@@ -149,9 +168,9 @@ GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
-		s,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 7
-		y,y,y,y,y,y,y,y,y,y,k,y,y,y,y,y,	// 8
+		t,t,t,t,t,y,t,t,t,t,t,t,t,t,t,t,	// 6
+		s,t,t,y,y,k,t,t,t,t,t,t,t,t,t,t,	// 7
+		y,y,y,k,k,k,y,y,y,y,y,o,o,y,y,y,	// 8
 };	//ゲームのマップ
 
 //ゲームマップの初期化
@@ -385,6 +404,8 @@ VOID MY_START_PROC(VOID)
 
 	if (MY_KEY_DOWN(KEY_INPUT_RETURN) == TRUE)
 	{
+		PlaySoundMem(BGM_PUSH.handle, DX_PLAYTYPE_BACK);
+
 		if (CheckSoundMem(BGM_TITLE.handle) != 0)
 		{
 			StopSoundMem(BGM_TITLE.handle);	//BGMを止める
@@ -466,6 +487,16 @@ VOID MY_PLAY_PROC(VOID)
 
 		GameScene = GAME_SCENE_END;
 
+		//プレイヤーの位置に置き換える
+		player.image.x = player.CenterX - player.image.width / 2;
+		player.image.y = player.CenterY - player.image.height / 2;
+
+		//画面外にプレイヤーが行かないようにする
+		if (player.image.x < 0) { player.image.x = 0; }
+		if (player.image.x + player.image.width > GAME_WIDTH) { player.image.x = GAME_WIDTH - player.image.width; }
+		if (player.image.y < 0) { player.image.y = 0; }
+		if (player.image.y + player.image.height > GAME_HEIGHT) { player.image.y = GAME_HEIGHT - player.image.height; }
+
 		return;
 	}
 
@@ -499,6 +530,27 @@ VOID MY_PLAY_DRAW(VOID)
 				TRUE);
 		}
 	}
+
+	//プレイヤーを描画する(画像を引き伸ばして描画※処理負荷が高い！多用に注意！)
+	DrawExtendGraph(
+		player.image.x, player.image.y,														//ココから
+		player.image.x + player.image.width * 2, player.image.y + player.image.height * 2,	//ココまで引き伸ばす
+		player.image.handle, TRUE);
+
+
+	/*
+	//プレイヤーを描画する(画像を拡大回転して描画※処理負荷が高い！多用に注意！)
+	DrawRotaGraph(
+		player.image.x, player.image.y,
+		2.0,							//拡大率
+		DX_PI * 2 / 4 * 2,				//回転率(ラジアン)　※円を４分割して、考えよう！
+		player.image.handle, TRUE);
+	*/
+
+	/*
+	//プレイヤーのを描画する
+	DrawGraph(player.image.x, player.image.y, player.image.handle, TRUE);
+	*/
 
 	DrawString(0, 0, "プレイ画面(スペースーキーを押して)", GetColor(255, 255, 255));
 	return;
@@ -549,6 +601,22 @@ BOOL MY_LOAD_IMAGE(VOID)
 	ImageBack.x = GAME_WIDTH / 2 - ImageBack.width / 2;		//左右中央揃え
 	ImageBack.y = GAME_HEIGHT / 2 - ImageBack.height / 2;		//上下中央揃え
 
+		//プレイヤーの画像
+	strcpy_s(player.image.path, IMAGE_PLAYER_PATH);		//パスの設定
+	player.image.handle = LoadGraph(player.image.path);	//読み込み
+	if (player.image.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), IMAGE_PLAYER_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+	GetGraphSize(player.image.handle, &player.image.width, &player.image.height);	//画像の幅と高さを取得
+	player.image.x = GAME_WIDTH / 2 - player.image.width / 2;		//左右中央揃え
+	player.image.y = GAME_HEIGHT / 2 - player.image.height / 2;		//上下中央揃え
+	player.CenterX = player.image.x + player.image.width / 2;		//画像の横の中心を探す
+	player.CenterY = player.image.y + player.image.height / 2;		//画像の縦の中心を探す
+	player.speed = CHARA_SPEED_LOW;									//スピードを設定
+
 	//タイトル背景
 	strcpy_s(ImageTitleBK.path, IMAGE_TITLE_BK_PATH);			//パスの設定
 	ImageTitleBK.handle = LoadGraph(ImageTitleBK.path);			//読み込み
@@ -572,7 +640,7 @@ BOOL MY_LOAD_IMAGE(VOID)
 		return FALSE;
 	}
 	GetGraphSize(ImageTitleROGO.image.handle, &ImageTitleROGO.image.width, &ImageTitleROGO.image.height);	//画像の幅と高さを取得
-	ImageTitleROGO.image.x = 500;							//光っている部分から描画したい
+	ImageTitleROGO.image.x = 512;							//光っている部分から描画したい
 	ImageTitleROGO.image.y = GAME_HEIGHT / 3;				//中央寄せ
 	ImageTitleROGO.angle = DX_PI * 2;						//回転率
 	ImageTitleROGO.angleMAX = DX_PI * 2;					//回転率MAX
@@ -595,7 +663,7 @@ BOOL MY_LOAD_IMAGE(VOID)
 	ImageTitleSTART.CntMAX = IMAGE_TITLE_START_CNT_MAX;		//カウンタMAX
 	ImageTitleSTART.IsDraw = FALSE;							//描画させない
 
-		//マップの画像を分割する
+	//マップの画像を分割する
 	int mapRes = LoadDivGraph(
 		GAME_MAP_PATH,										//赤弾のパス
 		MAP_DIV_NUM, MAP_DIV_TATE, MAP_DIV_YOKO,			//赤弾を分割する数
@@ -639,6 +707,7 @@ BOOL MY_LOAD_IMAGE(VOID)
 VOID MY_DELETE_IMAGE(VOID)
 {
 	DeleteGraph(ImageBack.handle);
+	DeleteGraph(player.image.handle);
 	DeleteGraph(ImageTitleBK.handle);
 	DeleteGraph(ImageTitleROGO.image.handle);
 	DeleteGraph(ImageTitleSTART.image.handle);
@@ -661,6 +730,17 @@ BOOL MY_LOAD_MUSIC(VOID)
 		return FALSE;
 	}
 
+	//PUSH ENTER KEYの音
+	strcpy_s(BGM_PUSH.path, MUSIC_PUSH_ENTER_PATH);				//パスの設定
+	BGM_PUSH.handle = LoadSoundMem(BGM_PUSH.path);			//読み込み
+	if (BGM_PUSH.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), MUSIC_PUSH_ENTER_PATH, MUSIC_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+
+	//プレイ画面のBGM
 	strcpy_s(BGM.path, MUSIC_BGM_PATH);				//パスの設定
 	BGM.handle = LoadSoundMem(BGM.path);			//読み込み
 	if (BGM.handle == -1)
@@ -676,8 +756,9 @@ BOOL MY_LOAD_MUSIC(VOID)
 //音楽をまとめて削除する関数
 VOID MY_DELETE_MUSIC(VOID)
 {
-	DeleteSoundMem(BGM_TITLE.handle);
-	DeleteSoundMem(BGM.handle);
+	DeleteSoundMem(BGM_TITLE.handle);	//タイトルのBGM
+	DeleteSoundMem(BGM_PUSH.handle);	//PUSH ENTER KEYの音
+	DeleteSoundMem(BGM.handle);			//プレイ画面のBGM
 
 	return;
 }
