@@ -1,4 +1,4 @@
 ﻿  MyGame.cpp
-C:\Users\g19007\Documents\2年次の授業\作品Ⅲ\ゲーム制作\MyGame.cpp(440,28): warning C4553: '==': 式の結果が使用されていません。'=' を意図していますか?
-C:\Users\g19007\Documents\2年次の授業\作品Ⅲ\ゲーム制作\MyGame.cpp(662,24): warning C4244: '=': 'double' から 'int' への変換です。データが失われる可能性があります。
+C:\Users\g19007\Documents\2年次の授業\作品Ⅲ\ゲーム制作\MyGame.cpp(495,28): warning C4553: '==': 式の結果が使用されていません。'=' を意図していますか?
+C:\Users\g19007\Documents\2年次の授業\作品Ⅲ\ゲーム制作\MyGame.cpp(788,24): warning C4244: '=': 'double' から 'int' への変換です。データが失われる可能性があります。
   ゲーム制作.vcxproj -> C:\Users\g19007\Documents\2年次の授業\作品Ⅲ\ゲーム制作\Debug\ゲーム制作.exe

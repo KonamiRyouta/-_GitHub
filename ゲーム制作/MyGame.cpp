@@ -9,13 +9,15 @@
 
 #define GAME_FPS	60	//FPSの数値
 
+#define MOUSE_BUTTON_CODE	129	//0x0000～0x0080まで
+
 #define PATH_MAX	255
 
 //エラーメッセージ(タイトル画像)
 #define IMAGE_LOAD_ERR_TITLE	TEXT("画像読み込みエラー")
 
 #define IMAGE_BACK_PATH			TEXT(".\\IMAGE\\背景_a.png")
-#define IMAGE_PLAYER_PATH		TEXT(".\\IMAGE\\キャラ.png")	//プレイヤーの画像
+#define IMAGE_PLAYER_PATH		TEXT(".\\IMAGE\\キャラ2.png")	//プレイヤーの画像
 
 #define IMAGE_TITLE_BK_PATH			TEXT(".\\IMAGE\\タイトル.png")						//タイトル背景の画像
 #define IMAGE_TITLE_ROGO_PATH		TEXT(".\\IMAGE\\タイトル_レトロアクション_3.png")	//タイトルロゴの画像
@@ -51,6 +53,9 @@
 #define START_ERR_TITLE		TEXT("スタート位置エラー")
 #define START_ERR_CAPTION	TEXT("スタート位置が決まっていません")
 
+#define MOUSE_R_CLICK_TITLE		TEXT("ゲーム中断")
+#define MOUSE_R_CLICK_CAPTION	TEXT("ゲームを中断し、タイトル画面に戻りますか？")
+
 enum GAME_MAP_KIND
 {
 	n = -1,
@@ -80,6 +85,16 @@ typedef struct STRUCT_I_POINT
 	int y = -1;
 }iPOINT;
 
+typedef struct STRUCT_MOUSE
+{
+	int InputValue = 0;	//GetMouseInputの値を入れる
+	int WheelValue = 0;	//マウスホイールの回転量(奥はプラス値 / 手前はマイナス値)
+	iPOINT Point;		//マウスの座標が入る
+	iPOINT OldPoint;	//マウスの座標(直前)が入る
+	int OldButton[MOUSE_BUTTON_CODE] = { 0 };	//マウスのボタン入力(直前)が入る
+	int Button[MOUSE_BUTTON_CODE] = { 0 };	//マウスのボタン入力が入る
+}MOUSE;
+
 typedef struct STRUCT_IMAGE
 {
 	char path[PATH_MAX];
@@ -96,6 +111,9 @@ typedef struct STRUCT_CHARA
 	int speed;					//速さ
 	int CenterX;				//中心X
 	int CenterY;				//中心Y
+
+	RECT coll;					//当たり判定
+	iPOINT collBeforePt;		//当たる前の座標
 
 }CHARA;	//キャラクター構造体
 
@@ -148,6 +166,11 @@ int SampleNumFps = GAME_FPS;
 char AllKeyState[256] = { '\0' };
 char OldAllKeyState[256] = { '\0' };
 
+int PlayerX, PlayerY;
+int JumpPower;
+
+MOUSE mouse;
+
 int GameScene;
 
 IMAGE ImageBack;
@@ -162,15 +185,27 @@ MUSIC BGM;
 
 GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
 	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
-		t,t,t,t,t,y,t,t,t,t,t,t,t,t,t,t,	// 6
-		s,t,t,y,y,k,t,t,t,t,t,t,t,t,t,t,	// 7
-		y,y,y,k,k,k,y,y,y,y,y,o,o,y,y,y,	// 8
+		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 0
+		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 1
+		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 2
+		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 3
+		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 4
+		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 5
+		t,t,t,t,t,y,t,t,t,t,y,t,t,t,t,t,	// 6
+		s,t,t,y,y,k,t,t,t,t,y,t,t,t,t,t,	// 7
+		o,y,y,k,k,k,y,y,y,y,y,o,o,y,y,y,	// 8
+
+	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
+		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 7
+		//y,y,y,y,y,y,y,y,y,y,y,o,o,y,y,y,	// 8
+
 };	//ゲームのマップ
 
 //ゲームマップの初期化
@@ -184,6 +219,9 @@ MAP map[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX];
 
 //スタートの位置
 iPOINT startPt{ -1,-1 };
+
+//マップの当たり判定
+RECT mapColl[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX];
 
 VOID MY_FPS_UPDATE(VOID);
 VOID MY_FPS_DRAW(VOID);
@@ -211,6 +249,9 @@ VOID MY_DELETE_IMAGE(VOID);
 
 BOOL MY_LOAD_MUSIC(VOID);		//音楽をまとめて読み込む関数
 VOID MY_DELETE_MUSIC(VOID);		//音楽をまとめて削除する関数
+
+BOOL MY_CHECK_MAP1_PLAYER_COLL(RECT);
+BOOL MY_CHECK_RECT_COLL(RECT, RECT);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCndShow)
 {
@@ -411,6 +452,20 @@ VOID MY_START_PROC(VOID)
 			StopSoundMem(BGM_TITLE.handle);	//BGMを止める
 		}
 
+		SetMouseDispFlag(FALSE);			//マウスカーソルを非表示
+
+		//プレイヤーの中心位置を計算する
+		player.CenterX = startPt.x;
+		player.CenterY = startPt.y;
+
+		//プレイヤーの画像の位置を設定する
+		player.image.x = player.CenterX;
+		player.image.y = player.CenterY;
+
+		//プレイヤーの当たる以前の位置を設定する
+		player.collBeforePt.x = player.CenterX;
+		player.collBeforePt.y = player.CenterY;
+
 		GameScene = GAME_SCENE_PLAY;
 	}
 
@@ -478,7 +533,7 @@ VOID MY_PLAY(VOID)
 //プレイ画面の処理
 VOID MY_PLAY_PROC(VOID)
 {
-	if (MY_KEY_DOWN(KEY_INPUT_SPACE) == TRUE)
+	if (MY_KEY_DOWN(KEY_INPUT_LCONTROL) == TRUE)
 	{
 		if (CheckSoundMem(BGM.handle) != 0)
 		{
@@ -486,16 +541,6 @@ VOID MY_PLAY_PROC(VOID)
 		}
 
 		GameScene = GAME_SCENE_END;
-
-		//プレイヤーの位置に置き換える
-		player.image.x = player.CenterX - player.image.width / 2;
-		player.image.y = player.CenterY - player.image.height / 2;
-
-		//画面外にプレイヤーが行かないようにする
-		if (player.image.x < 0) { player.image.x = 0; }
-		if (player.image.x + player.image.width > GAME_WIDTH) { player.image.x = GAME_WIDTH - player.image.width; }
-		if (player.image.y < 0) { player.image.y = 0; }
-		if (player.image.y + player.image.height > GAME_HEIGHT) { player.image.y = GAME_HEIGHT - player.image.height; }
 
 		return;
 	}
@@ -509,6 +554,102 @@ VOID MY_PLAY_PROC(VOID)
 		//DX_PLAYTYPE_LOOP
 		PlaySoundMem(BGM.handle, DX_PLAYTYPE_LOOP);
 	}
+
+	//マウスを右クリックすると、タイトル画面に戻る
+	if (mouse.Button[MOUSE_INPUT_RIGHT] == TRUE)
+	{
+		//クリックした座標を取得しておく
+		iPOINT R_ClickPt = mouse.Point;
+
+		//マウスを表示
+		SetMouseDispFlag(TRUE);
+
+		//終了ダイアログを表示
+		int Ret = MessageBox(GetMainWindowHandle(), MOUSE_R_CLICK_CAPTION, MOUSE_R_CLICK_TITLE, MB_YESNO);
+
+		if (Ret == IDYES)		//YESなら、ゲームを中断する
+		{
+			//強制的にタイトル画面に飛ぶ
+			GameScene = GAME_SCENE_START;
+			return;
+
+		}
+		else if (Ret == IDNO)	//NOなら、ゲームを続行する
+		{
+			//マウスの位置を、クリックする前に戻す
+			SetMousePoint(R_ClickPt.x, R_ClickPt.y);
+
+			//マウスを非表示にする。
+			SetMouseDispFlag(FALSE);
+		}
+	}
+
+	player.speed = 2;
+	if (MY_KEY_DOWN(KEY_INPUT_A) == TRUE)
+	{
+		player.CenterX -= player.speed;
+	}
+	if (MY_KEY_DOWN(KEY_INPUT_D) == TRUE)
+	{
+		player.CenterX += player.speed;
+	}
+
+	//当たり判定
+	player.coll.left = player.CenterX - mapChip.width / 2 + 5;
+	player.coll.top = player.CenterY - mapChip.height / 2 + 5;
+	player.coll.right = player.CenterX + mapChip.width / 2 - 5;
+	player.coll.bottom = player.CenterY + mapChip.height / 2 - 5;
+
+	BOOL IsMove = TRUE;
+
+	//プレイヤーとマップがあたっていたら
+	if (MY_CHECK_MAP1_PLAYER_COLL(player.coll) == TRUE)
+	{
+		/*[キー操作ここから]*/
+		player.CenterX = player.collBeforePt.x;
+		player.CenterY = player.collBeforePt.y;
+		
+		//SetMousePoint(player.collBeforePt.x, player.collBeforePt.y);
+
+		IsMove = FALSE;
+	}
+
+	//当たり判定が追いつかないので、画像の位置を当たり判定に使用する
+	//当たり判定の領域は、画像よりも少し縮小する。縮小加減は、お好みで。
+	RECT PlayerRect;
+	PlayerRect.left = player.image.x + 40;
+	PlayerRect.top = player.image.y + 40;
+	PlayerRect.right = player.image.x + player.image.width - 40;
+	PlayerRect.bottom = player.image.y + player.image.height - 40;
+
+	//プレイヤーが画面外に出たら
+	if (player.image.x > GAME_WIDTH || player.image.y > GAME_HEIGHT
+		|| player.image.x + player.image.width < 0 || player.image.y + player.image.height < 0)
+	{
+		//BGMが流れているなら
+		if (CheckSoundMem(BGM.handle) != 0)
+		{
+			StopSoundMem(BGM.handle);	//BGMを止める
+		}
+
+		//SetMouseDispFlag(TRUE);			//マウスカーソルを表示
+
+		//GameEndKind = GAME_END_FAIL;	//ミッションフォールト！
+
+		GameScene = GAME_SCENE_END;
+
+		return;	//強制的にエンド画面に飛ぶ
+	}
+
+	//プレイヤーの位置に置き換える
+	player.image.x = player.CenterX - player.image.width / 2;
+	player.image.y = player.CenterY - player.image.height / 2;
+
+	//画面外にプレイヤーが行かないようにする
+	if (player.image.x < 0) { player.image.x = 0; }
+	if (player.image.x + player.image.width > GAME_WIDTH) { player.image.x = GAME_WIDTH - player.image.width; }
+	if (player.image.y < 0) { player.image.y = 0; }
+	if (player.image.y + player.image.height > GAME_HEIGHT) { player.image.y = GAME_HEIGHT - player.image.height; }
 
 	return;
 }
@@ -529,30 +670,34 @@ VOID MY_PLAY_DRAW(VOID)
 				mapChip.handle[map[tate][yoko].kind],
 				TRUE);
 		}
+	}	
+	
+	//当たり判定の描画（デバッグ用）
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//壁ならば
+			if (mapData[tate][yoko] == y)
+			{
+				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
+			}
+
+			//通路ならば
+			if (mapData[tate][yoko] == t)
+			{
+				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
+			}
+		}
 	}
 
-	//プレイヤーを描画する(画像を引き伸ばして描画※処理負荷が高い！多用に注意！)
-	DrawExtendGraph(
-		player.image.x, player.image.y,														//ココから
-		player.image.x + player.image.width * 2, player.image.y + player.image.height * 2,	//ココまで引き伸ばす
-		player.image.handle, TRUE);
-
-
-	/*
-	//プレイヤーを描画する(画像を拡大回転して描画※処理負荷が高い！多用に注意！)
-	DrawRotaGraph(
-		player.image.x, player.image.y,
-		2.0,							//拡大率
-		DX_PI * 2 / 4 * 2,				//回転率(ラジアン)　※円を４分割して、考えよう！
-		player.image.handle, TRUE);
-	*/
-
-	/*
 	//プレイヤーのを描画する
 	DrawGraph(player.image.x, player.image.y, player.image.handle, TRUE);
-	*/
+	
+	//当たり判定の描画（デバッグ用）
+	DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
 
-	DrawString(0, 0, "プレイ画面(スペースーキーを押して)", GetColor(255, 255, 255));
+	DrawString(0, 0, "プレイ画面(左のコントロールキーを押して)", GetColor(255, 255, 255));
 	return;
 }
 
@@ -588,35 +733,6 @@ VOID MY_END_DRAW(VOID)
 //画像の読み込み
 BOOL MY_LOAD_IMAGE(VOID)
 {
-	//プレイ背景
-	strcpy_s(ImageBack.path, IMAGE_BACK_PATH);			//パスの設定
-	ImageBack.handle = LoadGraph(ImageBack.path);			//読み込み
-	if (ImageBack.handle == -1)
-	{
-		//エラーメッセージ表示
-		MessageBox(GetMainWindowHandle(), IMAGE_BACK_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
-		return FALSE;
-	}
-	GetGraphSize(ImageBack.handle, &ImageBack.width, &ImageBack.height);	//画像の幅と高さを取得
-	ImageBack.x = GAME_WIDTH / 2 - ImageBack.width / 2;		//左右中央揃え
-	ImageBack.y = GAME_HEIGHT / 2 - ImageBack.height / 2;		//上下中央揃え
-
-		//プレイヤーの画像
-	strcpy_s(player.image.path, IMAGE_PLAYER_PATH);		//パスの設定
-	player.image.handle = LoadGraph(player.image.path);	//読み込み
-	if (player.image.handle == -1)
-	{
-		//エラーメッセージ表示
-		MessageBox(GetMainWindowHandle(), IMAGE_PLAYER_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
-		return FALSE;
-	}
-	GetGraphSize(player.image.handle, &player.image.width, &player.image.height);	//画像の幅と高さを取得
-	player.image.x = GAME_WIDTH / 2 - player.image.width / 2;		//左右中央揃え
-	player.image.y = GAME_HEIGHT / 2 - player.image.height / 2;		//上下中央揃え
-	player.CenterX = player.image.x + player.image.width / 2;		//画像の横の中心を探す
-	player.CenterY = player.image.y + player.image.height / 2;		//画像の縦の中心を探す
-	player.speed = CHARA_SPEED_LOW;									//スピードを設定
-
 	//タイトル背景
 	strcpy_s(ImageTitleBK.path, IMAGE_TITLE_BK_PATH);			//パスの設定
 	ImageTitleBK.handle = LoadGraph(ImageTitleBK.path);			//読み込み
@@ -663,6 +779,35 @@ BOOL MY_LOAD_IMAGE(VOID)
 	ImageTitleSTART.CntMAX = IMAGE_TITLE_START_CNT_MAX;		//カウンタMAX
 	ImageTitleSTART.IsDraw = FALSE;							//描画させない
 
+	//プレイ背景
+	strcpy_s(ImageBack.path, IMAGE_BACK_PATH);			//パスの設定
+	ImageBack.handle = LoadGraph(ImageBack.path);			//読み込み
+	if (ImageBack.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), IMAGE_BACK_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+	GetGraphSize(ImageBack.handle, &ImageBack.width, &ImageBack.height);	//画像の幅と高さを取得
+	ImageBack.x = GAME_WIDTH / 2 - ImageBack.width / 2;		//左右中央揃え
+	ImageBack.y = GAME_HEIGHT / 2 - ImageBack.height / 2;		//上下中央揃え
+
+	//プレイヤーの画像
+	strcpy_s(player.image.path, IMAGE_PLAYER_PATH);		//パスの設定
+	player.image.handle = LoadGraph(player.image.path);	//読み込み
+	if (player.image.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), IMAGE_PLAYER_PATH, IMAGE_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+	GetGraphSize(player.image.handle, &player.image.width, &player.image.height);	//画像の幅と高さを取得
+	player.image.x = GAME_WIDTH / 2 - player.image.width / 2;		//左右中央揃え
+	player.image.y = GAME_HEIGHT / 2 - player.image.height / 2;		//上下中央揃え
+	player.CenterX = player.image.x + player.image.width / 2;		//画像の横の中心を探す
+	player.CenterY = player.image.y + player.image.height / 2;		//画像の縦の中心を探す
+	player.speed = CHARA_SPEED_LOW;									//スピードを設定
+
 	//マップの画像を分割する
 	int mapRes = LoadDivGraph(
 		GAME_MAP_PATH,										//赤弾のパス
@@ -697,6 +842,19 @@ BOOL MY_LOAD_IMAGE(VOID)
 			//マップの座標を設定
 			map[tate][yoko].x = yoko * map[tate][yoko].width;
 			map[tate][yoko].y = tate * map[tate][yoko].height;
+		}
+	}
+
+	//マップの当たり判定を設定する
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//マップの当たり判定を設定
+			mapColl[tate][yoko].left = (yoko + 0) * mapChip.width + 1;
+			mapColl[tate][yoko].top = (tate + 0) * mapChip.height + 1;
+			mapColl[tate][yoko].right = (yoko + 1) * mapChip.width - 1;
+			mapColl[tate][yoko].bottom = (tate + 1) * mapChip.height - 1;
 		}
 	}
 
@@ -761,4 +919,39 @@ VOID MY_DELETE_MUSIC(VOID)
 	DeleteSoundMem(BGM.handle);			//プレイ画面のBGM
 
 	return;
+}
+
+//マップとプレイヤーの当たり判定をする関数
+BOOL MY_CHECK_MAP1_PLAYER_COLL(RECT player)
+{
+	//マップの当たり判定を設定する
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//プレイヤーとマップが当たっているとき
+			if (MY_CHECK_RECT_COLL(player, mapColl[tate][yoko]) == TRUE)
+			{
+				//壁のときは、プレイヤーとマップが当たっている
+				if (map[tate][yoko].kind == y) { return TRUE; }
+			}
+		}
+	}
+
+	return FALSE;
+}
+
+//領域の当たり判定をする関数
+BOOL MY_CHECK_RECT_COLL(RECT a, RECT b)
+{
+	if (a.left < b.right &&
+		a.top < b.bottom &&
+		a.right > b.left &&
+		a.bottom > b.top
+		)
+	{
+		return TRUE;	//当たっている
+	}
+
+	return FALSE;		//当たっていない
 }
