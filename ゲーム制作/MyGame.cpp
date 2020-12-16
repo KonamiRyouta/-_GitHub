@@ -185,15 +185,15 @@ MUSIC BGM;
 
 GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
 	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
-		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 0
-		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 1
-		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 2
-		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 3
-		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 4
-		t,t,t,t,t,t,t,t,t,t,y,t,t,t,t,t,	// 5
-		t,t,t,t,t,y,t,t,t,t,y,t,t,t,t,t,	// 6
-		s,t,t,y,y,k,t,t,t,t,y,t,t,t,t,t,	// 7
-		o,y,y,k,k,k,y,y,y,y,y,o,o,y,y,y,	// 8
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
+		t,t,t,t,t,y,t,t,t,t,t,t,t,t,t,t,	// 6
+		s,t,t,y,y,y,t,t,t,t,y,t,t,t,t,t,	// 7
+		y,y,y,k,k,k,y,y,y,y,y,o,o,y,y,y,	// 8
 
 	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
 		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
@@ -462,10 +462,6 @@ VOID MY_START_PROC(VOID)
 		player.image.x = player.CenterX;
 		player.image.y = player.CenterY;
 
-		//プレイヤーの当たる以前の位置を設定する
-		player.collBeforePt.x = player.CenterX;
-		player.collBeforePt.y = player.CenterY;
-
 		GameScene = GAME_SCENE_PLAY;
 	}
 
@@ -594,6 +590,28 @@ VOID MY_PLAY_PROC(VOID)
 		player.CenterX += player.speed;
 	}
 
+	// 落下処理
+	player.CenterY -= JumpPower;
+
+	// 落下加速度を加える
+	JumpPower -= 1;
+
+	// もし地面についていたら止まる
+	if (player.CenterY > 480)
+	{
+		player.CenterY = 480;
+		JumpPower = 0;
+	}
+
+	// ジャンプボタンを押していて、地面についていたらジャンプ
+	if (MY_KEY_DOWN(KEY_INPUT_SPACE) && player.CenterY == 480)
+	{
+		JumpPower = 15;
+	}
+
+	// 画面を初期化する
+	ClearDrawScreen();
+
 	//当たり判定
 	player.coll.left = player.CenterX - mapChip.width / 2 + 5;
 	player.coll.top = player.CenterY - mapChip.height / 2 + 5;
@@ -650,6 +668,10 @@ VOID MY_PLAY_PROC(VOID)
 	if (player.image.x + player.image.width > GAME_WIDTH) { player.image.x = GAME_WIDTH - player.image.width; }
 	if (player.image.y < 0) { player.image.y = 0; }
 	if (player.image.y + player.image.height > GAME_HEIGHT) { player.image.y = GAME_HEIGHT - player.image.height; }
+
+	//プレイヤーの当たる以前の位置を設定する
+	player.collBeforePt.x = player.CenterX;
+	player.collBeforePt.y = player.CenterY;
 
 	return;
 }
