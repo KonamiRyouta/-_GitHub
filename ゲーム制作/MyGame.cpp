@@ -63,7 +63,8 @@ enum GAME_MAP_KIND
 	y = 1,
 	s = 2,
 	k = 3,
-	o = 5
+	o = 5,
+	w = 6
 };	//マップの種類
 
 
@@ -192,8 +193,8 @@ GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
 		t,t,t,t,t,y,t,t,t,t,t,t,t,t,t,t,	// 6
-		s,t,t,y,y,y,t,t,t,t,y,t,t,t,t,t,	// 7
-		y,y,y,k,k,k,y,y,y,y,y,o,o,y,y,y,	// 8
+		s,t,t,y,y,w,t,t,t,t,y,t,t,t,t,t,	// 7
+		y,y,y,k,k,k,y,y,y,y,k,o,o,y,y,y,	// 8
 
 	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
 		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
@@ -695,29 +696,29 @@ VOID MY_PLAY_DRAW(VOID)
 	}	
 	
 	//当たり判定の描画（デバッグ用）
-	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
-	{
-		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
-		{
-			//壁ならば
-			if (mapData[tate][yoko] == y)
-			{
-				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
-			}
+	//for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	//{
+	//	for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+	//	{
+	//		//壁ならば
+	//		if (mapData[tate][yoko] == y)
+	//		{
+	//			DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
+	//		}
 
-			//通路ならば
-			if (mapData[tate][yoko] == t)
-			{
-				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
-			}
-		}
-	}
+	//		//通路ならば
+	//		if (mapData[tate][yoko] == t)
+	//		{
+	//			DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
+	//		}
+	//	}
+	//}
 
 	//プレイヤーのを描画する
 	DrawGraph(player.image.x, player.image.y, player.image.handle, TRUE);
 	
 	//当たり判定の描画（デバッグ用）
-	DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
+	//DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
 
 	DrawString(0, 0, "プレイ画面(左のコントロールキーを押して)", GetColor(255, 255, 255));
 	return;
@@ -956,6 +957,7 @@ BOOL MY_CHECK_MAP1_PLAYER_COLL(RECT player)
 			{
 				//壁のときは、プレイヤーとマップが当たっている
 				if (map[tate][yoko].kind == y) { return TRUE; }
+				if (map[tate][yoko].kind == w) { return TRUE; }
 			}
 		}
 	}
