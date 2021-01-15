@@ -44,7 +44,7 @@
 #define MUSIC_BGM_PATH	TEXT(".\\MUSIC\\NES-Action-D02-2(Stage1-Loop130).mp3")
 
 #define GAME_MAP_TATE_MAX	9
-#define GAME_MAP_YOKO_MAX	16
+#define GAME_MAP_YOKO_MAX	32
 #define GAME_MAP_KIND_MAX	2
 
 #define GAME_MAP_PATH			TEXT(".\\IMAGE\\MAP\\map1.png")
@@ -172,8 +172,13 @@ int SampleNumFps = GAME_FPS;
 char AllKeyState[256] = { '\0' };
 char OldAllKeyState[256] = { '\0' };
 
-int PlayerX, PlayerY;
 int JumpPower;
+
+int key;
+int ScrollX, ScrollY;
+
+int Move;
+int MoveCounter;
 
 MOUSE mouse;
 
@@ -190,28 +195,17 @@ MUSIC BGM_PUSH;
 MUSIC BGM;
 
 GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
-	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
-		t,t,t,t,t,y,t,t,t,t,t,t,t,t,t,t,	// 6
-		s,t,t,y,y,w,t,t,t,t,y,t,t,t,t,t,	// 7
-		y,y,y,k,k,k,y,y,y,y,k,o,o,y,y,y,	// 8
-
-	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
-		//t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 7
-		//y,y,y,y,y,y,y,y,y,y,y,o,o,y,y,y,	// 8
-
+	//  0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 0
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 1
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 2
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
+		s,t,y,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 7
+		y,y,y,y,y,y,y,y,y,y,y,o,o,y,y,y,y,y,y,y,y,y,y,y,y,y,y,o,o,y,y,y,	// 8
+		
 };	//ゲームのマップ
 
 //ゲームマップの初期化
@@ -586,15 +580,57 @@ VOID MY_PLAY_PROC(VOID)
 		}
 	}
 
-	player.speed = 2;
-	if (MY_KEY_DOWN(KEY_INPUT_A) == TRUE)
+	if (Move == 0)
 	{
-		player.CenterX -= player.speed;
+		player.speed = 2;
+		if (MY_KEY_DOWN(KEY_INPUT_A) == TRUE)
+		{
+			player.CenterX -= player.speed;
+			Move = 1;
+		}
+		if (MY_KEY_DOWN(KEY_INPUT_D) == TRUE)
+		{
+			player.CenterX += player.speed;
+			Move = 1;
+		}
+
+		if (Move == 1)
+		{
+			if (mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX] == 0)
+			{
+				Move = 0;
+			}
+			else
+			{
+				MoveCounter = 0;
+			}
+		}
+
+		ScrollX = 0;
+		ScrollY = 0;
 	}
-	if (MY_KEY_DOWN(KEY_INPUT_D) == TRUE)
+
+	if (Move == 1);
 	{
-		player.CenterX += player.speed;
+		MoveCounter++;
+
+		if (MoveCounter == GAME_FPS)
+		{
+			Move = 0;
+
+			player.CenterX += player.speed;
+
+			ScrollX = 0;
+			ScrollY = 0;
+		}
+		else
+		{
+			ScrollX = -(player.speed * GAME_WIDTH * MoveCounter / GAME_FPS);
+			ScrollY = -(player.speed * GAME_HEIGHT * MoveCounter / GAME_FPS);
+		}
 	}
+
+	int flag;
 
 	// 落下処理
 	player.CenterY -= JumpPower;
@@ -603,14 +639,14 @@ VOID MY_PLAY_PROC(VOID)
 	JumpPower -= 1;
 
 	// もし地面についていたら止まる
-	if (player.CenterY > 480)
+	if (player.coll.bottom > 512)
 	{
-		player.CenterY = 480;
+		player.coll.bottom = 512;
 		JumpPower = 0;
 	}
 
 	// ジャンプボタンを押していて、地面についていたらジャンプ
-	if (MY_KEY_DOWN(KEY_INPUT_SPACE) && player.CenterY == 480)
+	if (MY_KEY_DOWN(KEY_INPUT_SPACE) && player.coll.bottom == 512)
 	{
 		JumpPower = 15;
 	}
@@ -700,30 +736,30 @@ VOID MY_PLAY_DRAW(VOID)
 		}
 	}	
 	
-	//当たり判定の描画（デバッグ用）
-	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
-	{
-		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
-		{
-			//壁ならば
-			if (mapData[tate][yoko] == y)
-			{
-				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
-			}
+	////当たり判定の描画（デバッグ用）
+	//for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	//{
+	//	for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+	//	{
+	//		//壁ならば
+	//		if (mapData[tate][yoko] == y)
+	//		{
+	//			DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
+	//		}
 
-			//通路ならば
-			if (mapData[tate][yoko] == t)
-			{
-				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
-			}
-		}
-	}
+	//		//通路ならば
+	//		if (mapData[tate][yoko] == t)
+	//		{
+	//			DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
+	//		}
+	//	}
+	//}
 
 	//プレイヤーのを描画する
 	DrawGraph(player.image.x, player.image.y, player.image.handle, TRUE);
 	
-	//当たり判定の描画（デバッグ用）
-	DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
+	////当たり判定の描画（デバッグ用）
+	//DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
 
 	DrawString(0, 0, "プレイ画面(左のコントロールキーを押して)", GetColor(255, 255, 255));
 	return;
