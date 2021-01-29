@@ -69,7 +69,9 @@ enum GAME_MAP_KIND
 	s = 2,
 	k = 3,
 	o = 5,
-	w = 6
+	w = 6,
+	f = 7,
+	g = 17
 };	//マップの種類
 
 
@@ -117,6 +119,22 @@ typedef struct STRUCT_CHARA
 	int speed;					//速さ
 	int CenterX;				//中心X
 	int CenterY;				//中心Y
+	//BOOL IsJump;
+	//int JumpPower;
+	//int x;
+	//int y;
+	//int mapX;
+	//int mapY;
+	//int width;
+	//int height;
+
+	//int choseiX;
+	//int choseiY;
+	//int choseiWidth;
+	//int choseiHeight;
+
+	//int JumpTimeCnt;
+	//int BeforeJumpY;
 
 	RECT coll;					//当たり判定
 	iPOINT collBeforePt;		//当たる前の座標
@@ -175,7 +193,10 @@ char OldAllKeyState[256] = { '\0' };
 int JumpPower;
 
 int key;
+int OldX, OldY;
 int ScrollX, ScrollY;
+
+int PlayerX, PlayerY;
 
 int Move;
 int MoveCounter;
@@ -202,8 +223,8 @@ GAME_MAP_KIND mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 3
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 4
 		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 5
-		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
-		s,t,y,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 7
+		t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,f,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 6
+		s,t,t,t,t,t,t,t,t,t,t,t,t,t,t,g,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,	// 7
 		y,y,y,y,y,y,y,y,y,y,y,o,o,y,y,y,y,y,y,y,y,y,y,y,y,y,y,o,o,y,y,y,	// 8
 		
 };	//ゲームのマップ
@@ -252,6 +273,10 @@ VOID MY_DELETE_MUSIC(VOID);		//音楽をまとめて削除する関数
 
 BOOL MY_CHECK_MAP1_PLAYER_COLL(RECT);
 BOOL MY_CHECK_RECT_COLL(RECT, RECT);
+
+VOID MY_PLAY_MOVE_JUMP(VOID);
+
+BOOL MY_CHECK_CHARA_GROUND(CHARA p);								//プレイヤーが地面と接しているか当たり判定をする関数
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCndShow)
 {
@@ -580,6 +605,7 @@ VOID MY_PLAY_PROC(VOID)
 		}
 	}
 
+	// 移動中ではない場合キー入力を受け付ける
 	if (Move == 0)
 	{
 		player.speed = 2;
@@ -594,6 +620,7 @@ VOID MY_PLAY_PROC(VOID)
 			Move = 1;
 		}
 
+		// 進入不可能なマップだった場合は移動できない
 		if (Move == 1)
 		{
 			if (mapData[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX] == 0)
@@ -606,33 +633,37 @@ VOID MY_PLAY_PROC(VOID)
 			}
 		}
 
+		// 停止中は画面のスクロールは行わない
 		ScrollX = 0;
 		ScrollY = 0;
 	}
 
+	// 移動中の場合は移動処理を行う
 	if (Move == 1);
 	{
 		MoveCounter++;
 
+		// 移動処理が終了したら停止中にする
 		if (MoveCounter == GAME_FPS)
 		{
 			Move = 0;
 
-			player.CenterX += player.speed;
+			PlayerX = startPt.x;
 
+			// プレイヤーの位置を変更する
+			PlayerX += 2;
+
+			// 停止中は画面のスクロールは行わない
 			ScrollX = 0;
 			ScrollY = 0;
 		}
 		else
 		{
-			ScrollX = -(player.speed * GAME_WIDTH * MoveCounter / GAME_FPS);
-			ScrollY = -(player.speed * GAME_HEIGHT * MoveCounter / GAME_FPS);
+			// 経過時間からスクロール量を算出する
+			ScrollX = -(2 * GAME_WIDTH * MoveCounter / GAME_FPS);
 		}
 	}
 
-	int flag;
-
-	// 落下処理
 	player.CenterY -= JumpPower;
 
 	// 落下加速度を加える
@@ -650,6 +681,7 @@ VOID MY_PLAY_PROC(VOID)
 	{
 		JumpPower = 15;
 	}
+
 
 	// 画面を初期化する
 	ClearDrawScreen();
@@ -736,30 +768,30 @@ VOID MY_PLAY_DRAW(VOID)
 		}
 	}	
 	
-	////当たり判定の描画（デバッグ用）
-	//for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
-	//{
-	//	for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
-	//	{
-	//		//壁ならば
-	//		if (mapData[tate][yoko] == y)
-	//		{
-	//			DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
-	//		}
+	//当たり判定の描画（デバッグ用）
+	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+	{
+		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+		{
+			//壁ならば
+			if (mapData[tate][yoko] == y)
+			{
+				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(0, 0, 255), FALSE);
+			}
 
-	//		//通路ならば
-	//		if (mapData[tate][yoko] == t)
-	//		{
-	//			DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
-	//		}
-	//	}
-	//}
+			//通路ならば
+			if (mapData[tate][yoko] == t)
+			{
+				DrawBox(mapColl[tate][yoko].left, mapColl[tate][yoko].top, mapColl[tate][yoko].right, mapColl[tate][yoko].bottom, GetColor(255, 255, 0), FALSE);
+			}
+		}
+	}
 
 	//プレイヤーのを描画する
 	DrawGraph(player.image.x, player.image.y, player.image.handle, TRUE);
 	
-	////当たり判定の描画（デバッグ用）
-	//DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
+	//当たり判定の描画（デバッグ用）
+	DrawBox(player.coll.left, player.coll.top, player.coll.right, player.coll.bottom, GetColor(255, 0, 0), FALSE);
 
 	DrawString(0, 0, "プレイ画面(左のコントロールキーを押して)", GetColor(255, 255, 255));
 	return;
@@ -1020,3 +1052,66 @@ BOOL MY_CHECK_RECT_COLL(RECT a, RECT b)
 
 	return FALSE;		//当たっていない
 }
+
+//VOID MY_PLAY_MOVE_JUMP(VOID)
+//{
+//	if (MY_KEY_DOWN(KEY_INPUT_SPACE) == TRUE)
+//	{
+//		if (MY_CHECK_CHARA_GROUND(player) == TRUE)
+//		{
+//			if (player.IsJump == FALSE)
+//			{
+//				player.IsJump = TRUE;
+//				player.BeforeJumpY = player.CenterY;
+//				player.BeforeJumpY = player.CenterY;
+//				player.JumpPower = -10;
+//			}
+//		}
+//	}
+//
+//	if (player.IsJump == TRUE)
+//	{
+//		player.mapY -= GAME_GR;											//重力に負けない！
+//		int  y_temp = player.mapY;										//現在のY座標を記録
+//		player.mapY += (player.mapY - player.BeforeJumpY) + player.JumpPower;	//上に向かう数値を計算させる
+//		player.JumpPower = 1;												//初速度を１にする
+//		player.BeforeJumpY = y_temp;										//以前の位置に記録
+//		player.y = player.mapY;
+//
+//		//地面に当たっていれば
+//		if (MY_CHECK_CHARA_GROUND(player) == TRUE)
+//		{
+//			//ジャンプ終了
+//			player.IsJump = FALSE;
+//		}
+//	}
+//}
+
+//プレイヤーが地面と接しているか当たり判定をする関数
+//BOOL MY_CHECK_CHARA_GROUND(CHARA p)
+//{
+//	//グリフィンがいる位置を配列的に計算する
+//	//int ArrX_L = (p.mapX + player.choseiX) / MAP_DIV_WIDTH;				//X位置（左）
+//	int yoko = (p.mapX + p.width + p.choseiWidth) / MAP_DIV_WIDTH;	//X位置（右）
+//	int tate = (p.mapY + p.height + p.choseiHeight) / MAP_DIV_HEIGHT;//Y位置(下の埋まっている位置)
+//
+//	//画面外の値を取得しない
+//	//if (ArrX_L < 0) { ArrX_L = 0; }
+//	if (yoko >= GAME_MAP_YOKO_MAX) { yoko = GAME_MAP_YOKO_MAX - 1; }
+//
+//	//プレイヤーとマップが当たっているとき
+//	//壁のときは、プレイヤーとマップが当たっている
+//	for (int tate = 0; tate < GAME_MAP_TATE_MAX; tate++)
+//	{
+//		for (int yoko = 0; yoko < GAME_MAP_YOKO_MAX; yoko++)
+//		{
+//				//壁のときは、プレイヤーとマップが当たっている
+//				if (map[tate][yoko].kind == y)
+//				{
+//					return TRUE;
+//				}
+//		}
+//	}
+//
+//	return FALSE;
+//}
