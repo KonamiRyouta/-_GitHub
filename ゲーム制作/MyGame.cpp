@@ -1,4 +1,5 @@
-#include"DxLib.h"
+#include "DxLib.h"
+#include "resource.h"
 
 #define GAME_WIDTH	1024	//画面の横
 #define GAME_HEIGHT 576		//画面の縦	
@@ -48,6 +49,7 @@
 #define MUSIC_PUSH_ENTER_PATH	TEXT(".\\MUSIC\\システム決定音_9.mp3")
 #define MUSIC_BGM_COMP_PATH			TEXT(".\\MUSIC\\Game Clear.mp3")				//コンプリートBGM
 #define MUSIC_BGM_FAIL_PATH			TEXT(".\\MUSIC\\Game Over.mp3")					//フォールトBGM
+#define MUSIC_PUSH_SPACE_PATH	TEXT(".\\MUSIC\\レトロジャンプ.mp3")
 
 #define MUSIC_LOAD_ERR_TITLE	TEXT("音楽読み込みエラー")
 
@@ -265,6 +267,7 @@ IMAGE_BLINK ImageEndFAIL;				//エンドフォールの画像
 MUSIC BGM_TITLE;
 MUSIC BGM_PUSH;
 MUSIC BGM;
+MUSIC BGM_SPACE;
 MUSIC BGM_COMP;		//コンプリートのBGM
 MUSIC BGM_FAIL;		//フォールトのBGM
 
@@ -290,9 +293,9 @@ GAME_MAP_KIND2 mapData2[GAME_MAP_TATE_MAX][GAME_MAP_YOKO_MAX]{
 		T,T,T,T,T,T,T,T,T,T,T,T,T,T,T,T,	// 3(224)
 		T,T,T,T,T,T,T,T,T,T,T,T,T,T,T,T,	// 4(288)
 		T,T,T,T,T,T,T,T,T,T,T,T,T,T,T,F,	// 5(352)
-		S,T,T,D,T,T,D,T,O,T,T,T,O,T,T,G,	// 6(416)
-		Y,Y,Y,Y,Y,Y,Y,Y,T,Y,Y,Y,T,Y,Y,Y,	// 7(480)
-		W,W,W,W,W,W,W,W,T,W,W,W,T,W,W,W		// 8
+		S,T,T,D,T,T,D,T,T,T,O,T,T,T,T,G,	// 6(416)
+		Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,	// 7(480)
+		W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W		// 8
 
 };	//ゲームのマップ
 
@@ -770,7 +773,7 @@ VOID MY_START_DRAW(VOID)
 		DrawGraph(ImageTitleSTART.image.x, ImageTitleSTART.image.y, ImageTitleSTART.image.handle, TRUE);
 	}
 
-	DrawString(0, 0, "スタート画面(エンターキーを押して)", GetColor(255, 255, 255));
+	//DrawString(0, 0, "スタート画面(エンターキーを押して)", GetColor(255, 255, 255));
 	return;
 }
 
@@ -1056,6 +1059,8 @@ VOID MY_PLAY_PROC(VOID)
 	// ジャンプボタンを押していて、地面についていたらジャンプ
 	if (MY_KEY_DOWN(KEY_INPUT_SPACE) && player.CenterY == 416)
 	{
+		PlaySoundMem(BGM_SPACE.handle, DX_PLAYTYPE_BACK);
+
 		JumpPower = 15;
 	}
 
@@ -1433,6 +1438,8 @@ VOID MY_PLAY2_PROC(VOID)
 	// ジャンプボタンを押していて、地面についていたらジャンプ
 	if (MY_KEY_DOWN(KEY_INPUT_SPACE) && player.CenterY == 416)
 	{
+		PlaySoundMem(BGM_SPACE.handle, DX_PLAYTYPE_BACK);
+
 		JumpPower = 15;
 	}
 
@@ -1935,6 +1942,15 @@ BOOL MY_LOAD_MUSIC(VOID)
 		return FALSE;
 	}
 
+	strcpy_s(BGM_SPACE.path, MUSIC_PUSH_SPACE_PATH);				//パスの設定
+	BGM_SPACE.handle = LoadSoundMem(BGM_SPACE.path);			//読み込み
+	if (BGM_SPACE.handle == -1)
+	{
+		//エラーメッセージ表示
+		MessageBox(GetMainWindowHandle(), MUSIC_PUSH_SPACE_PATH, MUSIC_LOAD_ERR_TITLE, MB_OK);
+		return FALSE;
+	}
+
 	//コンプリートBGM
 	strcpy_s(BGM_COMP.path, MUSIC_BGM_COMP_PATH);				//パスの設定
 	BGM_COMP.handle = LoadSoundMem(BGM_COMP.path);				//読み込み
@@ -1964,6 +1980,7 @@ VOID MY_DELETE_MUSIC(VOID)
 	DeleteSoundMem(BGM_TITLE.handle);	//タイトルのBGM
 	DeleteSoundMem(BGM_PUSH.handle);	//PUSH ENTER KEYの音
 	DeleteSoundMem(BGM.handle);			//プレイ画面のBGM
+	DeleteSoundMem(BGM_SPACE.handle);
 	DeleteSoundMem(BGM_COMP.handle);
 	DeleteSoundMem(BGM_FAIL.handle);
 
